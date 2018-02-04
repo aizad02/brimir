@@ -14,9 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-class Attachment < ActiveRecord::Base
+class Attachment < ApplicationRecord
   # polymorphic relation with tickets & replies
   belongs_to :attachable, polymorphic: true
+
+  scope :inline, -> { where.not(content_id: nil) }
+  scope :non_inline, -> { where(content_id: nil) }
 
   has_attached_file :file,
       path: Tenant.files_path,

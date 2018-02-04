@@ -16,12 +16,12 @@
         <div class="row collapse">
           <% params.delete(:controller) %>
           <% params.delete(:action) %>
-          <%= link_to tickets_path(:csv, params), class: 'radius tiny button right mlm no-m' do %>
+          <%= link_to tickets_path(:csv, permitted_params), class: 'radius tiny button right mlm no-m' do %>
             <i class="fa fa-cloud-download" style="top:1px"></i>
           <% end %>
 
           <% if params[:status] == 'deleted' %>
-            <%= link_to tickets_deleted_path, method: :delete, 'data-confirm' => t(:are_you_sure_empty_trash), class: 'secondary radius tiny button right mlm' do %>
+            <%= link_to tickets_deleted_path, data: { remote: true, method: :delete, confirm: t(:are_you_sure_empty_trash) }, class: 'secondary radius tiny button right mlm' do %>
               <i class="fa fa-bomb" style="top:1px"></i>
             <% end %>
           <% end %>
@@ -67,7 +67,7 @@
       </li>
     </ul>
     <% @tickets.each do |ticket| %>
-      <div class="priority-<%= ticket.priority %> row ticket bb" style="height: 4em;" data-ticket-url="<%= ticket_url(ticket) %>">
+      <div class="priority-<%= ticket.priority %> <%= ticket.is_unread?(current_user) ? 'unread' : '' %> row ticket bb" style="height: 4em;" data-ticket-url="<%= ticket_url(ticket) %>">
         <div class="medium-6 plxxl v-middle columns">
           <input type="checkbox" value="<%= ticket.id %>" name="id[]" class="no-mb" data-toggle-check />
           <%= user_avatar ticket.user, class: 'avatar left mrl mts mlm', size: 30 %>
@@ -156,9 +156,11 @@
 </section>
 
 <script>
-  window.onblur = function() {
-    window.onfocus = function() {
-      location.reload(true);
-    };
-  };
+  document.addEventListener("DOMContentLoaded", function(event) {
+    $(document).on('hide', function() {
+      $(document).on('show', function() {
+        location.reload(true);
+      });
+    });
+  });
 </script>

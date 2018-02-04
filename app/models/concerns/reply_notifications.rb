@@ -129,7 +129,7 @@ concern :ReplyNotifications do
         end
       end
 
-      self.notified_users.uniq!
+      self.notified_users.distinct!
 
     else
       result = []
@@ -143,7 +143,7 @@ concern :ReplyNotifications do
         result += label.users
       end
 
-      self.notified_users = result.uniq
+      self.notified_users = result.to_a.uniq
     end
   end
 

@@ -14,6 +14,7 @@ nl:
   delete: Verwijderen
   close: Sluiten
   wait: Wachten
+  to: Tot
 
   joyride:
     tickets: Via deze knop kan iedereen nieuwe tickets aanmaken.
@@ -142,6 +143,9 @@ nl:
   your_ticket_has_been_closed: "Uw ticket is gesloten. Reageer op deze e-mail als het probleem niet is opgelost. Voor een nieuw probleem kunt u een losse e-mail sturen."
   str_is_working_on_your_ticket: "%{str} zal uw ticket behandelen."
 
+# notificantion_mailer/new_account
+  new_account_subject: 'Welkom bij Brimir!'
+
 # attachments/_attachment
   download: download
 
@@ -176,6 +180,7 @@ nl:
   localization_settings: Localizatie instellingen
   permissions: Rechten
   notification_settings: Notificatie instellingen
+  look_and_feel: Uitstraling
 
 # controllers/settings
   settings_saved: Instellingen opgeslagen
@@ -190,7 +195,11 @@ nl:
 
 # controllers/tickets
   ticket_added: Ticket toegevoegd
+  ticket_added_public: Uw aanvraag is verzonden naar de relevante service, u krijgt zo spoedig mogelijk bericht
+  form_validation_error: Ongeldig formulier. Vul het formululier correct in alstublieft
+  captcha_error: Los de captcha op alstublieft
   ticket_updated: Ticket gewijzigd
+  access_denied: Toegang geweigerd
 
 # controllers/tickets/deleted
   trash_emptied: Alle tickets zijn uit de prullenbak verwijderd
@@ -229,10 +238,27 @@ nl:
   verification_mail_will_be_sent: Zorg dat dit e-mailadres correct doorstuurd naar Brimir. Een automatische verificatie e-mail wordt verstuurd nadat u op opslaan klikt. Alleen geverifieerde e-mailadressen kunnen gebruikt worden voor uitgaande e-mail.
   mark_spam_spf: Brimir mails worden mogelijk als spam gemarkeerd als deze server niet wordt toegevoegd aan het SPF DNS record van het bovenstaande e-mailadres.
 
+# email_templates/index
+  already_active_template: Er is al een actief sjabloon voor een %{kind} e-mail, het instellen van de huidge optie zal de ander ongedaan maken.
+  new_email_template: Nieuw e-mailsjabloon
+  email_templates: E-mailsjablonen
+  deleting_this_item_will_unset_option: 'Het verwijderen van dit sjabloon zal de volgende optie ongedaan maken:'
+  set_active: Activeer
+  status: Toestand
+
+# email_templates/edit
+  modify_email_template: Wijzig e-mailsjabloon
+  tooltip: Blokhaken binnen het tekstveld worden automatisch vervangen door de nodige waardes.
+
 # controllers/email_addresses
   email_address_modified: E-mailadres gewijzigd
   email_address_added: E-mailadres toevoegd
   email_address_removed: Email address verwijderd
+
+# controllers/email_templates
+  email_template_modified: E-mailsjabloon gewijzigd
+  email_template_added: E-mailsjabloon toevoegd
+  email_template_removed: Emailsjabloon verwijderd
 
   activerecord:
     attributes:
@@ -247,6 +273,8 @@ nl:
         locale: Taal
         time_zone: Tijdzone
         per_page: Tickets per pagina
+        schedule_enabled_false: Altijd 24/7/365
+        schedule_enabled_true: Werk kan wachten, alleen tijdens mijn diensturen!
         prefer_plain_text: Verstuur en ontvang platte tekst reacties
         include_quote_in_reply: Voeg quote van originele bericht toe aan reactie
 
@@ -263,7 +291,9 @@ nl:
         priority: Prioriteit
         assignee_id: Toegewezen aan
         created_at: Aangemaakt op
-        to: Aan e-mailadres
+        to: Aan gevalideerd e-mailadres
+        orig_to: Aan e-mailadres
+        orig_cc: CC e-mailadres
 
       reply:
         from: Van e-mailadres
@@ -277,18 +307,77 @@ nl:
           equals: is gelijk aan
         action_operation: Uit te voeren actie
         action_operations:
-          assign_label: voeg label toe
-          notify_user: stuur notificatie aan
-          change_status: wijzig status in
-          change_priority: wijzig prioriteit in
-          assign_user: toewijzen aan
-        action_value: Parameter voor actie
+          assign_label: Voeg label toe
+          notify_user: Stuur notificatie aan
+          change_status: Wijzig status in
+          change_priority: Wijzig prioriteit in
+          assign_user: Toewijzen aan
 
       email_address:
         email: E-mailadres
         name: Naam
         default: Gebruik als standaard uitgaand e-mailadres
         verification_token: Geverifieerd
+
+      email_template:
+        name: Sjabloon naam
+        from: Van
+        kind: Soort
+        message: Bericht
+        kinds:
+          user_welcome:
+            template_name: Standaard gebruikers welkom
+            message: |
+              <div>
+              Beste [name],
+              <br />
+              <br />
+              Er is voor u een account aangemaakt bij voor Brimir!
+              <br />
+              <br />
+              Om in te kunnen loggen heeft u de volgende informatie nodig.
+              <br />
+              E-mail: [email]
+              <br />
+              Password: [password]
+              <br />
+              <br />
+              <strong>IMPORTANT!</strong>
+              <br />
+              Deze informatie wordt eenmalig verstrekt, bewaar deze goed!
+              <br />
+              <br />
+              Wachtwoord vergeten of kwijt? Herstel uw wachtwoord op:
+              <br />
+              http://[domain]/users/password/new
+              <br />
+              <br />
+              Met vriendelijke groet,
+              <br />
+              Webmaster [domain]
+              <br />
+              <br />
+              *** Dit is een automatisch gegenereerde e-mail, reageer alstublieft niet ***"
+              </div>
+
+          ticket_received:
+            template_name: Standaard ticket received
+            message: |
+              <div>
+              Beste [name],
+              <br />
+              <br />
+              Op [created_at], schreef u:
+              [content]
+              <br />
+              U ontvangt deze e-mail als bevestiging dat u ticket is ontvangen met onder het nummer [id] en zo spoedig mogelijk in behandeling zal worden genomen.
+              Met vriendelijke groet,
+              <br />
+              <br />
+              Webmaster [domain]
+              <br />
+              <br />
+              </div>
 
       tenant:
         default_locale: Standaard taal
@@ -297,3 +386,6 @@ nl:
         share_drafts: Deel concepten met andere medewerkers
         first_reply_ignores_notified_agents: Geen notificatie van eerste reactie aan andere agents voor toegewezen tickets
         notify_client_when_ticket_is_assigned_or_closed: Stuur een notificatie naar de klant als zijn ticket toegekend of gesloten wordt.
+        notify_client_when_ticket_is_created: Stuur een notificatie naar de klant, wanneer zijn nieuw aangemaakte ticket is ontvangen.
+        notify_user_when_account_is_created: Stuur de gebruiker een notificatie, wanneer een account is aangemaakt.
+        stylesheet_url: Voeg de locatie van uw eigen stylesheet toe.

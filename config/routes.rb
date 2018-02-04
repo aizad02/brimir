@@ -19,6 +19,8 @@ Brimir::Application.routes.draw do
 
   resources :rules
 
+  resources :email_templates
+
   resources :labels, only: [:destroy, :update, :index, :edit]
 
   resources :replies, only: [:create, :new, :update, :show]
@@ -27,6 +29,7 @@ Brimir::Application.routes.draw do
   resources :attachments, only: [:index, :new]
 
   resources :email_addresses
+  resources :email_imports, only: [:new, :create]
 
   resource :settings, only: [:edit, :update]
 

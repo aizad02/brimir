@@ -1,0 +1,27 @@
+default:
+  sunday: true
+  monday: true
+  tuesday: true
+  wednesday: true
+  thursday: true
+  friday: true
+  saturday: true
+
+parttimer:
+  sunday: false
+  monday: true
+  tuesday: true
+  wednesday: true
+  thursday: false
+  friday: false
+  saturday: false
+
+empty:
+  sunday: false
+  monday: false
+  tuesday: false
+  wednesday: false
+  thursday: false
+  friday: false
+  saturday: false
+

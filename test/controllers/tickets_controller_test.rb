@@ -19,14 +19,14 @@ require 'test_helper'
 class TicketsControllerTest < ActionController::TestCase
 
   setup do
-
     @ticket = tickets(:problem)
-
     # read_fixture doesn't work in ActionController::TestCase, so use File.new
     @simple_email = File.new('test/fixtures/ticket_mailer/simple').read
+    @simple_base64_email = File.new('test/fixtures/ticket_mailer/simple_base64').read
   end
 
   teardown do
+    Timecop.return
     I18n.locale = :en
   end
 
@@ -58,7 +58,9 @@ class TicketsControllerTest < ActionController::TestCase
     assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
       assert_difference 'Ticket.count' do
 
-        post :create, message: @simple_email, format: :json
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
 
         assert_response :success
       end
@@ -71,49 +73,39 @@ class TicketsControllerTest < ActionController::TestCase
 
   end
 
-  test 'should not create ticket when invalid' do
-
-    assert_no_difference 'ActionMailer::Base.deliveries.size' do
-      assert_no_difference 'Ticket.count' do
-        post :create, ticket: {
-            from: 'invalid',
-            content: '',
-            subject: '',
-        }
-
-        assert_response :success
-      end
-    end
-
-    assert_equal 0, assigns(:ticket).notified_users.count
-  end
-
-  test 'should create ticket when not signed in' do
+  test 'should accept tickets in Base64 encoding' do
+    I18n.locale = :nl
 
     assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
       assert_difference 'Ticket.count' do
-        post :create, ticket: {
-            from: 'test@test.nl',
-            content: @ticket.content,
-            subject: @ticket.subject,
-        }
+        post :create, params: { message: @simple_base64_email, format: :json }
 
         assert_response :success
       end
     end
-
-    refute_equal 0, assigns(:ticket).notified_users.count
   end
 
-  test 'should create ticket when signed in' do
+  # BEGIN OF TESTS FOR TICKET CREATION
+  # SITUATIONS:
+  # 1) CAPTCHA / NO CAPTCHA
+  # STATES TO TEST:
+  # 1) SIGNED IN / NOT SIGNED IN
+  # 2) ERROR IN FORM / NO ERROR IN FORM
+  # TESTS: SITUATIONS * (2^STATES)
+  # ========================================================
+
+  # FIRST
+  test 'should create ticket when signed in and captcha' do
     sign_in users(:alice)
 
     assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
       assert_difference 'Ticket.count', 1 do
-        post :create, ticket: {
+        post :create, params: {
+          ticket: {
             from: 'test@test.nl',
             content: @ticket.content,
             subject: @ticket.subject,
+          }
         }
 
         assert_redirected_to ticket_url(assigns(:ticket))
@@ -123,10 +115,859 @@ class TicketsControllerTest < ActionController::TestCase
     end
   end
 
+  # SECOND
+  test 'should not create ticket when ivalid and captcha and signed in' do
+    sign_in users(:alice)
+
+    assert_no_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_no_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+            from: 'invalid',
+            content: '',
+            subject: '',
+          }
+        }
+
+        assert_response :success
+      end
+    end
+
+    assert_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # THIRD
+  test 'should create ticket when not signed in and captcha' do
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # FOURTH
+  test 'should not create ticket when not signed in and invalid and captcha' do
+
+    assert_no_difference 'ActionMailer::Base.deliveries.size' do
+      assert_no_difference 'Ticket.count' do
+        post :create, params: { 
+          ticket: {
+          from: 'invalid',
+          content: '',
+          subject: '',
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    assert_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # FIFTH
+  test 'should create ticket when signed in and no captcha' do
+    # we need these after the test
+    secret_key = Recaptcha.configuration.secret_key
+    site_key  = Recaptcha.configuration.site_key
+
+    # set blank for this test
+    Recaptcha.configuration.secret_key = ''
+    Recaptcha.configuration.site_key = ''
+    sign_in users(:alice)
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count', 1 do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+
+      # set the configration back to default
+      Recaptcha.configuration.secret_key = secret_key
+      Recaptcha.configuration.site_key = site_key
+
+      refute_equal 0, assigns(:ticket).notified_users.count
+    end
+  end
+
+  # SIXTH
+  test 'should not create ticket when signed in and invalid and no captcha' do
+    # we need these after the test
+    secret_key = Recaptcha.configuration.secret_key
+    site_key  = Recaptcha.configuration.site_key
+
+    # set blank for this test
+    Recaptcha.configuration.secret_key = ''
+    Recaptcha.configuration.site_key = ''
+
+    sign_in users(:alice)
+    assert_no_difference 'ActionMailer::Base.deliveries.size' do
+      assert_no_difference 'Ticket.count' do
+        post :create, params: { 
+          ticket: {
+          from: 'invalid',
+          content: '',
+          subject: '',
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # set the configration back to default
+    Recaptcha.configuration.secret_key = secret_key
+    Recaptcha.configuration.site_key = site_key
+
+    assert_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # SEVENTH
+  test 'should create ticket when not signed in and no captcha' do
+    # we need these after the test
+    secret_key = Recaptcha.configuration.secret_key
+    site_key  = Recaptcha.configuration.site_key
+
+    # set blank for this test
+    Recaptcha.configuration.secret_key = ''
+    Recaptcha.configuration.site_key = ''
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count', 1 do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+
+
+      # set the configration back to default
+      Recaptcha.configuration.secret_key = secret_key
+      Recaptcha.configuration.site_key = site_key
+
+      refute_equal 0, assigns(:ticket).notified_users.count
+    end
+  end
+
+  # EIGHT
+  test 'should not create ticket when not signed in and no captcha' do
+    # we need these after the test
+    secret_key = Recaptcha.configuration.secret_key
+    site_key  = Recaptcha.configuration.site_key
+
+    # set blank for this test
+    Recaptcha.configuration.secret_key = ''
+    Recaptcha.configuration.site_key = ''
+
+    assert_no_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_no_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'invalid',
+          content: '',
+          subject: '',
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # set the configration back to default
+    Recaptcha.configuration.secret_key = secret_key
+    Recaptcha.configuration.site_key = site_key
+    assert_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # END OF TESTS FOR TICKET CREATION
+  # ========================================================
+
+  # BEGIN OF TESTS FOR NOTIFICATION SETTINGS FOR USER (SCHEDULE)
+  # SITUATIONS:
+  # 1) SCHEDULE ENABLED / SCHEDULE DISABLED / SCHEDULE NIL
+  # STATES TO TEST:
+  # 1) TIME WITHIN RANGE WORKING HOURS / TIME NOT WITHIN RANGE WORKING HOURS
+  # 2) DAY WITHIN RANGE WORKING DAYS / DAY WITH RANGE WORKING DAYS
+  #
+  # WAYS TO CREATE TICKETS
+  # 1) MTA
+  # 2) NEW TICKET LOGGED IN
+  # 3) NEW TICKET NOT LOGGED IN
+  #
+  # TESTS: WAYS TO CREATE TICKETS * ( SITUATIONS( == 1 ) * (1^N + 2) ) (WHERE CONSTANT 2 IS SCHEDULE NIL AND SCHEDULE DISABLED)
+  # ========================================================
+
+  # SCHEDULE ENABLED FOR MTA
+
+  # SCHEDULE NIL
+  test 'should notify agent when schedule is nil and ticket is created from MTA' do
+    agent = users(:alice)
+
+    agent.schedule = nil
+    agent.save!
+    agent.reload
+
+    assert_nil agent.schedule
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # SCHEDULE DISABLED
+  test 'should notify agent with schedule disabled when ticket is created from MTA' do
+    agent = users(:charlie)
+
+    assert_not_nil agent.schedule
+    assert_not agent.schedule_enabled
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: { 
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should notify agent with schedule enabled and day within work day range when ticked created from MTA' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should notify agent with schedule enabled and time within range working hours when ticked created from MTA' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 23:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and day not within working days range when ticked created from MTA' do
+    agent = users(:charlie)
+
+
+    agent.schedule = schedules(:parttimer) # charlie is now a parttimer
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert agent.schedule_enabled
+    assert_not_nil agent.schedule
+    assert agent.schedule.monday?
+    assert agent.schedule.tuesday?
+    assert agent.schedule.wednesday?
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-03 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and time not within range working hours when ticked created from MTA' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '22:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('22:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 23:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          message: @simple_email, format: :json
+        }
+
+        assert_response :success
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+  # END SCHEDULE ENABLED FOR MTA
+
+  # SCHEDULE ENABLED FOR NEW TICKET
+
+  # SCHEDULE NIL
+  test 'should notify agent when schedule is nil when ticket is created' do
+    agent = users(:alice)
+
+    agent.schedule = nil
+    agent.save!
+    agent.reload
+
+    assert_nil agent.schedule
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # SCHEDULE DISABLED
+  test 'should notify agent with schedule disabled when ticket is created' do
+    agent = users(:charlie)
+
+    assert_not_nil agent.schedule
+    assert_not agent.schedule_enabled
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+
+  test 'should notify agent with schedule enabled and day within work day range when ticked created' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should notify agent with schedule enabled and time within range working hours when ticked created' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 23:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and day not within working days range when ticked created' do
+    agent = users(:charlie)
+
+    agent.schedule = schedules(:parttimer) # charlie is now a parttimer
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    assert agent.schedule_enabled
+    assert_not_nil agent.schedule
+    assert agent.schedule.monday?
+    assert agent.schedule.tuesday?
+    assert agent.schedule.wednesday?
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-03 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and time not within range working hours when ticked created' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '22:00'
+
+    agent.save!
+    agent.reload
+
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('22:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 23:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_response :success
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # END SCHEDULE ENABLED FOR NEW TICKET
+
+  # SCHEDULE ENABLED FOR NEW TICKET WITH SIGNED IN AGENT
+
+  # SCHEDULE NIL
+  test 'should notify agent when schedule is nil when ticket is created with logged in agent' do
+    agent = users(:alice)
+
+    agent.schedule = nil
+    agent.save!
+    agent.reload
+
+    sign_in agent
+
+    assert_nil agent.schedule
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # SCHEDULE DISABLED
+  test 'should notify agent with schedule disabled when ticket is created with logged in agent' do
+    agent = users(:charlie)
+    sign_in agent
+
+    assert_not_nil agent.schedule
+    assert_not agent.schedule_enabled
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+
+  test 'should notify agent with schedule enabled and day within work day range when ticked created with logged in agent' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    sign_in agent
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should notify agent with schedule enabled and time within range working hours when ticked created with logged in agent' do
+    agent = users(:charlie)
+
+    # we need to stub the start and end
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    sign_in agent
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    # should have used English locale
+    assert_match 'View new ticket', ActionMailer::Base.deliveries.last.html_part.body.decoded
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and day not within working days range when ticked created with logged in agent' do
+    agent = users(:charlie)
+
+    agent.schedule = schedules(:parttimer) # charlie is now a parttimer
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '23:00'
+
+    agent.save!
+    agent.reload
+
+    sign_in agent
+    assert agent.schedule_enabled
+    assert_not_nil agent.schedule
+    assert agent.schedule.monday?
+    assert agent.schedule.tuesday?
+    assert agent.schedule.wednesday?
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('23:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-03 00:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  test 'should not notify agent with schedule enabled and time not within range working hours when ticked created with logged in agent' do
+    agent = users(:charlie)
+
+    agent.schedule_enabled = true
+    agent.schedule.start = '00:00'
+    agent.schedule.end = '22:00'
+
+    agent.save!
+    agent.reload
+
+    sign_in agent
+    assert_not_nil agent.schedule
+    assert agent.schedule_enabled
+    assert_equal agent.schedule.start, Time.find_zone('UTC').parse('00:00')
+    assert_equal agent.schedule.end, Time.find_zone('UTC').parse('22:00')
+
+    new_time = Time.find_zone(agent.time_zone).parse('2016-12-02 23:00')
+    Timecop.freeze(new_time)
+
+    assert_equal new_time, Time.now
+
+    assert_difference 'ActionMailer::Base.deliveries.size', User.agents.count-1 do
+      assert_difference 'Ticket.count' do
+        post :create, params: {
+          ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+        }
+
+        assert_redirected_to ticket_url(assigns(:ticket))
+      end
+    end
+
+    refute_equal 0, assigns(:ticket).notified_users.count
+  end
+
+  # END SCHEDULE ENABLED FOR NEW TICKET WITH SIGNED IN AGENT
+
+  # END OF TESTS FOR NOTIFICATION SETTINGS FOR USER (SCHEDULE)
+  # ========================================================
+
   test 'should only allow agents to view others tickets' do
     sign_in users(:bob)
 
-    get :show, id: tickets(:multiple)
+    get :show, params: { id: tickets(:multiple) }
     assert_response :unauthorized # redirect to sign in page
   end
 
@@ -149,7 +990,7 @@ class TicketsControllerTest < ActionController::TestCase
   test 'should show ticket' do
     sign_in users(:alice)
 
-    get :show, id: @ticket.id
+    get :show, params: { id: @ticket.id }
     assert_response :success
 
     # should contain this for label adding with javascript
@@ -166,7 +1007,7 @@ class TicketsControllerTest < ActionController::TestCase
 
     # should have selected same outgoing address as original received
     assert_select 'option[selected="selected"]' +
-        "[value=\"#{email_addresses(:brimir).id}\"]"
+      "[value=\"#{email_addresses(:brimir).id}\"]"
 
     # should contain this for internal note switch
     assert_select '[data-notified-users]'
@@ -178,7 +1019,9 @@ class TicketsControllerTest < ActionController::TestCase
     # new assignee should receive notification
     assert_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { assignee_id: users(:charlie).id }
+      put :update, params: {
+        id: @ticket.id, ticket: { assignee_id: users(:charlie).id }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -194,7 +1037,9 @@ class TicketsControllerTest < ActionController::TestCase
     # assignee should receive notification
     assert_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { status: 'closed' }
+      put :update, params: {
+        id: @ticket.id, ticket: { status: 'closed' }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -210,7 +1055,9 @@ class TicketsControllerTest < ActionController::TestCase
     # assignee should receive notification
     assert_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { priority: 'high' }
+      put :update, params: { 
+        id: @ticket.id, ticket: { priority: 'high' }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -227,7 +1074,9 @@ class TicketsControllerTest < ActionController::TestCase
     # new assignee should not receive notification
     assert_no_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { assignee_id: users(:charlie).id }
+      put :update, params: {
+        id: @ticket.id, ticket: { assignee_id: users(:charlie).id }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -240,7 +1089,9 @@ class TicketsControllerTest < ActionController::TestCase
     # assignee should not receive notification
     assert_no_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { status: 'closed' }
+      put :update, params: {
+        id: @ticket.id, ticket: { status: 'closed' }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -253,7 +1104,9 @@ class TicketsControllerTest < ActionController::TestCase
     # assignee should not receive notification
     assert_no_difference 'ActionMailer::Base.deliveries.size' do
 
-      put :update, id: @ticket.id, ticket: { priority: 'high' }
+      put :update, params: {
+        id: @ticket.id, ticket: { priority: 'high' }
+      }
       assert_redirected_to ticket_path(@ticket)
 
     end
@@ -298,7 +1151,9 @@ class TicketsControllerTest < ActionController::TestCase
     assert_no_difference 'ActionMailer::Base.deliveries.size' do
       assert_difference 'Ticket.count' do
 
-        post :create, message: email, format: :json
+        post :create, params: {
+          message: email, format: :json
+        }
 
         assert_response :success
 
@@ -312,32 +1167,13 @@ class TicketsControllerTest < ActionController::TestCase
     assert_no_difference 'ActionMailer::Base.deliveries.size' do
       assert_no_difference 'Ticket.count' do
 
-        post :create, message: email, format: :json
+        post :create, params: {
+          message: email, format: :json
+        }
 
         assert_response :unprocessable_entity
 
       end
-    end
-  end
-
-  test 'shown captcha should not break new ticket page when not signed in' do
-    if Ticket.recaptcha_keys_present?
-
-      get :new
-
-      assert_response :success
-    end
-  end
-
-  test 'not shown captcha should not break new ticket page when not signed' do
-    Recaptcha.configuration.public_key = ''
-    Recaptcha.configuration.private_key = ''
-
-    if !(Ticket.recaptcha_keys_present?)
-
-      get :new
-
-      assert_response :success
     end
   end
 
@@ -355,7 +1191,9 @@ class TicketsControllerTest < ActionController::TestCase
     @ticket.save!
 
     @ticket.reload
-    get :show, id: @ticket.id, format: :eml
+    get :show, params: {
+      id: @ticket.id, format: :eml
+    }
     assert_response :success
   end
 
@@ -366,8 +1204,76 @@ class TicketsControllerTest < ActionController::TestCase
     @ticket.locked_at = Time.now
     @ticket.save!
 
-    get :show, id: @ticket.id
+    get :show, params: {
+      id: @ticket.id
+    }
     assert_response :success
     assert_match replies(:solution).content, @response.body
+  end
+
+  test 'should mark new ticket from MTA as unread for all users' do
+    assert_difference 'Ticket.count' do
+
+      post :create, params: {
+        message: @simple_email, format: :json
+      }
+
+      assert_response :success
+
+      ticket = Ticket.last
+      assert_not_nil ticket.unread_users.nil?
+    end
+  end
+
+  test 'should mark new ticket as unread for all users' do
+    assert_difference 'Ticket.count' do
+      post :create, params: {
+        ticket: {
+          from: 'test@test.nl',
+          content: @ticket.content,
+          subject: @ticket.subject,
+        }
+      }
+
+      assert_response :success
+
+      ticket = Ticket.last
+
+      assert_not_nil ticket.unread_users.nil?
+    end
+  end
+
+  test 'should mark new ticket as unread for all users when posted from MTA' do
+    assert_difference 'Ticket.count' do
+
+      post :create, params: {
+        message: @simple_email, format: :json
+      }
+
+      assert_response :success
+
+      ticket = Ticket.last
+      assert_not_nil ticket.unread_users
+    end
+  end
+
+  test 'should mark ticket as read when clicked' do
+    user = users(:alice)
+    sign_in user
+    ticket = Ticket.last
+    user.unread_tickets << ticket
+    assert_difference 'Ticket.last.unread_users.count', -1 do
+
+      assert_not_nil ticket.unread_users
+      assert_not_nil user.unread_tickets
+
+      get :show, params: {
+        id: ticket.id
+      }
+
+      assert_response :success
+
+      assert_not ticket.unread_users.include?(user)
+    end
   end
 end

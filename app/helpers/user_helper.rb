@@ -1,4 +1,4 @@
-# Brimir is a helpdesk system that can be used to handle email support requests.
+# Brimir is a helpdesk system to handle email support requests.
 # Copyright (C) 2012-2015 Ivaldi https://ivaldi.nl/
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,10 +14,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-require 'test_helper'
+# helpers used for EmailTemplate views
+module UserHelper
+  def build_schedule_for_user
+    # sanity check
+    return if @user.nil?
 
-class UserTest < ActiveSupport::TestCase
-  # test "the truth" do
-  #   assert true
-  # end
+    @user.schedule ||= @user.build_schedule
+
+    # we need this
+    @user.schedule
+  end
+
+  def localize_day_name(weekday)
+    t('date.day_names')[weekday].downcase
+  end
+
 end

@@ -12,11 +12,15 @@
 //
 //= require jquery
 //= require jquery_ujs
+//= require react
+//= require react_ujs
+//= require components
 //= require foundation
 //= require select2
-//= require tinymce-jquery
+//= require trix
 //= require tickets
 //= require fancybox
+//= require jquery-visibility
 
 (function() {
 
@@ -98,15 +102,34 @@
 
     });
 
-    tinyMCE.init({
-      autoresize_bottom_margin: 0,
-      selector: 'textarea.tinymce',
-      statusbar: false,
-      menubar: false,
-      toolbar: 'undo redo | bold italic | bullist numlist | outdent indent removeformat',
-      height: 150,
-      plugins: 'autoresize,paste',
+    jQuery('[data-ticket-url] a').on('click', function(e){
+      jQuery(this).closest('[data-ticket-url]').removeClass('unread');
     });
+
+    jQuery('input[type="radio"]').on('click', function() {
+      if(jQuery('#user_schedule_enabled_false').is(':checked')) {
+          jQuery('[data-work-can-wait]').hide("slow");
+      }
+      if(jQuery('#user_schedule_enabled_true').is(':checked')) {
+          jQuery('[data-work-can-wait]').show("slow");
+      }
+    });
+
+    jQuery('trix-editor').addClass('trix-editor');
+    jQuery('trix-toolbar').addClass('trix-toolbar');
+
+    // this was added because the trix editor doesn't support
+    // tabindexes. You can remove this block of code if
+    // https://github.com/maclover7/trix/pull/19 is merged.
+    (function setTabIndexForTextArea() {
+      var trix  = jQuery('trix-editor');
+      if (trix.length == 0)
+        return;
+      var index = jQuery('[tabindex]').last()[0].tabIndex;
+      var area  = jQuery('text-area');
+      area.tabIndex = index+1;
+      trix.attr('tabIndex', index+1);
+    })();
 
     jQuery(document).foundation();
 

@@ -1,4 +1,4 @@
-# Brimir is a helpdesk system that can be used to handle email support requests.
+# Brimir is a helpdesk system to handle email support requests.
 # Copyright (C) 2012-2015 Ivaldi https://ivaldi.nl/
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,8 +16,33 @@
 
 require 'test_helper'
 
-class AttachmentTest < ActiveSupport::TestCase
-  # test "the truth" do
-  #   assert true
-  # end
+class SettingsControllerTest < ActionController::TestCase
+
+  setup do
+
+    @tenant = tenants(:main)
+  end
+
+  teardown do
+    I18n.locale = :en
+  end
+
+  test 'should create e-mailtemplates' do
+    sign_in users(:alice)
+
+    # make sure there are now templates
+    EmailTemplate.delete_all
+
+    if EmailTemplate.count == 0
+      assert_difference 'EmailTemplate.count', 2 do
+        put :update, params: {
+          id: @tenant.id, tenant: {
+          notify_user_when_account_is_created: true,
+          notify_client_when_ticket_is_created: true
+          }
+        }
+      end
+    end
+  end
+
 end

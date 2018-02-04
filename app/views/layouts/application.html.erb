@@ -7,6 +7,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= content_for?(:title) ? yield(:title) : 'Brimir' %></title>
+
     <%= favicon_link_tag 'favicon.png' %>
     <%= stylesheet_link_tag '//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400italic,600,600italic' %>
 
@@ -17,6 +18,10 @@
     <% end %>
 
     <%= stylesheet_link_tag 'application-print', media: 'print' %>
+    <% if Tenant.current_tenant.stylesheet_url? %>
+      <%= stylesheet_link_tag Tenant.current_tenant.stylesheet_url %>
+    <% end %>
+
     <%= javascript_include_tag 'vendor/modernizr' %>
     <%= csrf_meta_tags %>
   </head>
@@ -43,6 +48,9 @@
             <div class="show-for-small-only">
               <%= render 'inbox_menu' %>
             </div>
+            <% if can? :index, EmailTemplate %>
+              <li class="hide-for-small-only"><a href="<%= email_templates_path %>"><i class="fa fa-file fa-fw"></i></a></li>
+            <% end %>
             <% if can? :index, EmailAddress %>
               <li class="hide-for-small-only"><a href="<%= email_addresses_path %>"><i class="fa fa-envelope fa-fw"></i></a></li>
             <% end %>
@@ -119,9 +127,7 @@
 
     <%= javascript_include_tag 'application' %>
 
-    <% if user_signed_in? && current_user.agent? && current_user.sign_in_count == 1 %>
-      <% current_user.sign_in_count += 1 %>
-      <% current_user.save %>
+    <% if user_signed_in? && @show_joyride %>
       <ol class="joyride-list" data-joyride data-options="expose: true;scroll_speed: 1000;">
         <li data-id="joyride-tickets" data-text="<%= t('joyride.next') %>" data-options="prev_button: false; tip_location: top;">
           <h4><%= t(:new_ticket) %></h4>

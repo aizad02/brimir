@@ -42,7 +42,7 @@ class Ability
   def customer(user)
     # customers can view replies where they were notified of
     can :read, Reply do |reply|
-      reply.notified_user_ids.include? user.id || reply.user_id == user.id
+      reply.notified_user_ids.include? user.id || reply.user_id == user.id || reply.kind_of?(StatusReply)
     end
     # customers can view their own replies
     can :read, Reply, user_id: user.id
@@ -120,6 +120,9 @@ class Ability
     can :manage, Rule
     can :manage, EmailAddress
     can :manage, Label
+    can :manage, EmailTemplate
+
+    can :create, :email_imports
 
     can :update, Tenant, id: Tenant.current_tenant.id
   end

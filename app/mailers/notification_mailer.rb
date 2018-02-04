@@ -64,6 +64,17 @@ class NotificationMailer < ActionMailer::Base
     end
   end
 
+  def new_account(user, template, tenant)
+    if tenant.notify_user_when_account_is_created
+      return unless template.is_active?
+      @template = template
+      @domain = tenant.domain
+      @user = user
+
+      mail(to: user.email, from: tenant.from, subject: I18n.t('new_account_subject'))
+    end
+  end
+
   def new_ticket(ticket, user)
     unless user.locale.blank?
       @locale = user.locale
@@ -78,6 +89,9 @@ class NotificationMailer < ActionMailer::Base
       headers['Message-ID'] = "<#{ticket.message_id}>"
     end
 
+    # for bounces, we don't use aliases
+    headers['Return-Path'] = Tenant.current_tenant.from
+
     @ticket = ticket
     @user = user
 
@@ -90,7 +104,10 @@ class NotificationMailer < ActionMailer::Base
     else
       @locale = Rails.configuration.i18n.default_locale
     end
-    title = I18n::translate(:new_reply, locale: @locale) + ': ' + reply.ticket.subject
+    title =  reply.ticket.subject
+    if user.agent?
+      title = I18n::translate(:new_reply, locale: @locale) + ': ' + title
+    end
 
     add_attachments(reply)
     add_reference_message_ids(reply)
@@ -99,6 +116,9 @@ class NotificationMailer < ActionMailer::Base
     unless reply.message_id.blank?
       headers['Message-ID'] = "<#{reply.message_id}>"
     end
+
+    # for bounces, we don't use aliases
+    headers['Return-Path'] = Tenant.current_tenant.from
 
     @reply = reply
     @user = user

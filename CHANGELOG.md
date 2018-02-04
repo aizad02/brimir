@@ -4,17 +4,58 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Brimir unreleased (to be announced)
 ### Added
-- Optional notification of customers when ticket is assigned or status is changed. Contributed by @fiedl.
-- Optional captcha for non-signed in ticket creation. Constributed by @git-jls.
+- Ability to import .eml files for mails sent to wrong email address. Contributed by @fiedl.
+- Ability to rename tickets. Contributed by @fiedl.
+
 ### Changed
+- Better error messages when an invalid input is given for non-signed in users. Contributed by @mickael-kerjean.
+- Better coverage for ticket creation, now covering situations with captcha. Contributed by @git-jls.
+- Moved Brimir to Rails version 5.0.0.1. Contributed by @git-jls.
+- Only add "New reply: " to subject of agent mails.
+- Return-Path is now filled with Tenant from address, to capture bounce mails when using aliases.
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+- Unread ticket status resulted in a big performance regression #345.
 
 ### Security
+
+## Brimir 0.7.3 (2016-12-19)
+### Added
+- Rule management interface has been improved, making it understandable for more users.
+- Tabindex for a better user experience when filling out ticket forms. Contributed by @git-jls.
+- Allows adding rules to filter on cc and actual to addresses. Contributed by @git-jls.
+- Unread ticket status, so the user can differentiate read/unread tickets in the inbox. Contributed by @git-jls.
+- User setting to turn off notifications during work or off-duty. Contributed by @git-jls.
+- Dutch and English translations for look and feel section settings page. Contributed by @git-jls.
+
+### Changed
+- Better error messages when an invalid input is given for non-signed in users. Contributed by @mickael-kerjean.
+- Better coverage for ticket creation, now covering situations with captcha. Contributed by @git-jls.
+- Removed unused code. Contributed by @git-jls
+
+### Fixed
+- Fixed issue with tickets missing a message_id. Contributed by @git-jls.
+- Disable captcha check for incoming email posts. Contributed by @git-jls.
+- Fixed signature and logic around recaptcha. Contributed by @git-jls.
+- Fixed issue for non signed in users not able to create tickets from the web gui when the captcha is disabled. Contributed by @git-jls.
+- Fixed issue with zone not being properly taken into account if schedule is set and ticket is created. by @git-jls.
+- Fixed issue with save_with_label method being called on a reply. Contributed by @git-jls.
+- Fixed issue with tickets not getting deleted from the trash. Contributed by @git-jls
+
+## Brimir 0.7.2 (2016-11-11)
+### Added
+- Optional notification of customers when ticket is assigned or status is changed. Contributed by @fiedl.
+- Optional captcha for non-signed in ticket creation. Contributed by @git-jls.
+- Optional emails and templates when a user account has been created and when a ticket has been received. Contributed by @git-jls.
+- Optional replaced tinymce with trix (WYSIWYG editor). Contributed by @git-jls.
+
+
+### Fixed
+- Posting an empty reply will no longer result in an error.
 
 ## Brimir 0.7.1 (2016-06-10)
 ### Added

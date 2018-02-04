@@ -11,6 +11,8 @@ Any Rails application needs a web server with Ruby support first. We use Phusion
 
 After setting up a webserver, you have to create a database for Brimir and modify the config file in `config/database.yml` to reflect the details. Set your details under the production section. We advise to use `adapter: postgresql` or `adapter: mysql2` for production usage, because those are the only two adapters and database servers we test. *If you plan to use MySQL, make sure you use utf8 as your charset and collation.*
 
+Your server will need a JavaScript runtime supported by [execjs](https://github.com/rails/execjs). We recommend [Node.js](https://nodejs.org/). The Node.js packages shipped by your distribution should be sufficient for this application.  Install via `apt-get install nodejs` on Debian/Ubuntu or `yum install nodejs` on RHEL/CentOS.
+
 Next up: configuring your outgoing email address and url. This can be set in `config/environments/production.rb` by adding the following lines *before* the keyword `end`:
 
     config.action_mailer.default_options = { from: 'brimir@yoururl.com' }
@@ -42,15 +44,15 @@ If you want to use LDAP, configure config/ldap.yml accordingly, then change the 
 (Optional for LDAP) Last thing left to do before logging in is making a user and adding some statuses. You can do this by running:
 
     bin/rails console production
-    u = User.new({ email: 'your@email.address', password: 'somepassword', password_confirmation: 'somepassword' }); u.agent = true; u.save!
+    u = User.new({ email: 'your@email.address', password: 'somepassword' }); u.agent = true; u.save!
 
 Configuring Captcha's
 ---------------------
 If you want to use recaptcha in production you have to go to
 https://www.google.com/recaptcha, create your private and public keys and export these to your production environment, by running:
 
-    export RECAPTCHA_PUBLIC_KEY="[YOUR_KEY]"
-    export RECAPTCHA_PRIVATE_KEY="[YOUR_KEY]"
+    export RECAPTCHA_SITE_KEY="[YOUR_KEY]"
+    export RECAPTCHA_SECRET_KEY="[YOUR_KEY]"
 
 Remove the recaptcha lines from config/secrets.yml if you don't want to use captcha's all together.
 
@@ -95,28 +97,21 @@ Some users have made requests for the following features. If you would like to c
 - Ability to sign in using a Single Sign On functionality based on Shared Token or JWT.
 - Private note addition to tickets.
 - Automated replies based on the current rule system.
-- Remove user functionality, without losing ticket and reply information.
 - Adding knowledge base functionality.
-- Welcome mail for new users (after mailing a ticket for example) with their password.
-- Set priority, assignee and labels on the create ticket form.
+- Set labels on the create ticket form.
 - Assign tickets to groups of users
 - When replying, select a response from pre-defined canned responses and modify to your needs
 - TicketsController#create should limit access to IP and be user/pass protected
-- TicketsController#new should be configurable as open-to-the-world or not
 - Integration with OpsWeekly
 - Social media integration such as FreshDesk and Zoho have (reply to requests via social media)
 - Ticket creation api (and improving existing api)
-- Unread ticket status per user.
 - Ticket search that also searches in from field and replies.
 - Mark tickets as duplicate, linking it to the duplicated ticket.
 - Ability to rename tickets (change their subject).
-- Ability to rename labels.
 - Improve rule form to allow only valid statuses (#150).
-- A better WYSIWYG editor, for example QuilJS (#172).
 - Timed rules, such as re-assigning when no reply is added withing 24 hours (#203).
 - Desktop notifications using web notifications (#218).
 - Custom ticket statuses, all via database. (#217)
-- Filter on to/cc/bcc without verified addresses. (#227)
 - IMAP or POP3 pull mechanism for new tickets. (#249)
 - Notes field for customer account, to add info about them, such as website url.
 

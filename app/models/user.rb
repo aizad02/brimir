@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-class User < ActiveRecord::Base
+class User < ApplicationRecord
   devise Rails.application.config.devise_authentication_strategy, :recoverable,
     :rememberable, :trackable, :validatable,:omniauthable,
     omniauth_providers: [:google_oauth2]
@@ -27,17 +27,31 @@ class User < ActiveRecord::Base
       foreign_key: 'assignee_id', dependent: :nullify
   has_many :notifications, dependent: :destroy
 
+  belongs_to :schedule
+
   # identities for omniauth
   has_many :identities
 
+  has_and_belongs_to_many :unread_tickets, class_name: 'Ticket'
+
   after_initialize :default_localization
   before_validation :generate_password
+
+  accepts_nested_attributes_for :schedule
 
   # All ldap users are agents by default, remove/comment this method if this
   # is not the intended behavior.
   def ldap_before_save
     self.agent = true
   end
+
+  scope :actives, -> {
+    where(active: true)
+  }
+
+  scope :inactives, -> {
+    where(active: false)
+  }
 
   scope :agents, -> {
     where(agent: true)
@@ -67,13 +81,21 @@ class User < ActiveRecord::Base
     super || name_from_email_address
   end
 
+  def is_working?
+    #sanity checks for default behaviour
+    return true unless schedule_enabled # this is the default behaviour
+    return true if schedule.nil? # this is the default behaviour
+    schedule.is_during_work?(Time.now.in_time_zone(self.time_zone))
+  end
+
   def name_from_email_address
     email.split('@').first
   end
 
+  # notify only active agents
   def self.agents_to_notify
     User.agents
-        .where(notify: true)
+        .where(notify: true).actives
   end
 
   # Does the email address of this user belong to the ticket system
@@ -108,5 +130,9 @@ class User < ActiveRecord::Base
     if encrypted_password.blank?
       self.password = Devise.friendly_token.first(12)
     end
+  end
+
+  def active_for_authentication?
+      super and self.active
   end
 end

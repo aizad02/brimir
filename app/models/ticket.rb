@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-class Ticket < ActiveRecord::Base
+class Ticket < ApplicationRecord
   include CreateFromUser
   include EmailMessage
   include TicketMerge
@@ -35,11 +35,13 @@ class Ticket < ActiveRecord::Base
 
   has_many :status_changes, dependent: :destroy
 
+  has_and_belongs_to_many :unread_users, class_name: 'User'
+
   enum status: [:open, :closed, :deleted, :waiting, :merged]
   enum priority: [:unknown, :low, :medium, :high]
 
   after_update :log_status_change
-  after_create :create_status_change
+  after_create :create_status_change, :create_message_id_if_blank
 
   def self.active_labels(status)
     label_ids = where(status: Ticket.statuses[status])
@@ -121,7 +123,17 @@ class Ticket < ActiveRecord::Base
     users = User.agents_to_notify.select do |user|
       Ability.new(user).can? :show, self
     end
-    self.notified_user_ids = users.map(&:id)
+    self.notified_user_ids = users.map do |user|
+      user.id if user.is_working?
+    end
+  end
+
+  def is_unread?(user)
+    unread_users.include? user
+  end
+
+  def mark_read(user)
+    unread_users.delete user
   end
 
   def status_times
@@ -165,13 +177,39 @@ class Ticket < ActiveRecord::Base
   end
 
   def self.recaptcha_keys_present?
-    !Recaptcha.configuration.public_key.blank? ||
-      !Recaptcha.configuration.private_key.blank?
+    !Recaptcha.configuration.site_key.blank? ||
+      !Recaptcha.configuration.secret_key.blank?
+  end
+
+  def save_with_label(label_name)
+    if label_name
+      label = Label.where(name: label_name).take
+      if label
+        self.labels << label
+        self.save
+      else
+        label = Label.new(name: label_name)
+        Ticket.transaction do
+          label.save
+          self.labels << label
+          self.save
+        end
+      end
+    else
+      self.save
+    end
   end
 
   protected
     def create_status_change
       status_changes.create! status: self.status
+    end
+
+    def create_message_id_if_blank
+      if self.message_id.blank?
+        self.message_id = Mail::MessageIdField.new.message_id
+        self.save!
+      end
     end
 
     def log_status_change

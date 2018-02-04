@@ -33,15 +33,17 @@
 
       <p class="text-s no-mb text-center mtl">
         <%= render 'devise/shared/links' %>
-        <span class="mrs mls">&middot;</span>
-        <%= link_to t(:new_ticket), new_ticket_path %>
+	<% if Tenant.current_tenant.ticket_creation_is_open_to_the_world %>
+          <span class="mrs mls">&middot;</span>
+          <%= link_to t(:new_ticket), new_ticket_path %>
+	<% end %>
         <span class="mrs mls">&middot;</span>
         <%= link_to 'GetBrimir.com', 'https://getbrimir.com' %>
       </p>
       <p class="text-center">
         <% unless Rails.application.secrets[:google_client_id].blank? %>
         <%= t(:omniauth_sign_in_title) %>:
-          <%= link_to user_omniauth_authorize_path(:google_oauth2) do %>
+          <%= link_to user_google_oauth2_omniauth_authorize_path do %>
             <i class="fa fa-google-plus-square"></i>
             <%= t(:omniauth_sign_in_google) %>
           <% end %>

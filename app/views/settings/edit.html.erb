@@ -22,11 +22,22 @@
 
       <%= f.check_box :share_drafts %>
 
+      <%= f.check_box :ticket_creation_is_open_to_the_world %>
+
       <h5><%= t(:notification_settings) %></h5>
 
       <%= f.check_box :first_reply_ignores_notified_agents %>
 
       <%= f.check_box :notify_client_when_ticket_is_assigned_or_closed %>
+
+      <%= f.check_box :notify_client_when_ticket_is_created %>
+
+      <%= f.check_box :notify_user_when_account_is_created %>
+
+      <h5><%= t(:look_and_feel) %></h5>
+
+      <%= f.text_field :stylesheet_url %>
+
     </div>
 
     <div class="medium-6 columns">

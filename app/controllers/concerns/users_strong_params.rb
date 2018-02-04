@@ -26,13 +26,27 @@ module UsersStrongParams
         :remember_me,
         :signature,
         :agent,
+        :active,
         :notify,
         :time_zone,
         :locale,
         :per_page,
         :prefer_plain_text,
         :include_quote_in_reply,
-        label_ids: []
+        :schedule_enabled,
+        label_ids: [],
+        schedule_attributes: [
+          :id,
+          :start,
+          :end,
+          :monday,
+          :tuesday,
+          :wednesday,
+          :thursday,
+          :friday,
+          :saturday,
+          :sunday,
+        ]
     )
 
     # prevent normal user and limited agent from changing email and role
